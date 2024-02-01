@@ -10,10 +10,9 @@ const char* ssid = "UW MPSK";
 const char* password = "xKYV;j?44#"; // Replace with your network password
 #define DATABASE_URL "https://esp32-firebase-demo-53641-default-rtdb.firebaseio.com/" // Replace with your database URL
 #define API_KEY "AIzaSyA7Iunk4YsBKpnsnVu62YsjVQHhT6Crwxc" // Replace with your API key
-#define STAGE_INTERVAL 12000 // 12 seconds each stage
 #define MAX_WIFI_RETRIES 5 // Maximum number of WiFi connection retries
 
-int uploadInterval = 500; // 1 seconds 2 upload
+int uploadInterval = 5000; // 1 seconds 2 upload
 
 //Define Firebase Data object
 FirebaseData fbdo;
@@ -39,70 +38,44 @@ void initFirebase();
 void sendDataToFirebase(float distance);
 
 void setup() {
-  // put your setup code here, to run once:
   Serial.begin(115200);
 
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
 
-  // // First, we let the device run for 12 seconds without doing anything
-  // Serial.println("Running for 12 seconds without doing anything...");
-  unsigned long startTime = millis();
-  // while (millis() - startTime < STAGE_INTERVAL)
-  // {
-  //   delay(100); // Delay between measurements
-  // }
-
-  // // Second, we start with the ultrasonic sensor only
-  // Serial.println("Measuring distance for 12 seconds...");
-  // startTime = millis();
-  // while (millis() - startTime < STAGE_INTERVAL)
-  // {
-  //   measureDistance();
-  //   delay(100); // Delay between measurements
-  // }
-
-  // // Now, turn on WiFi and keep measuring
-  // Serial.println("Turning on WiFi and measuring for 12 seconds...");
   connectToWiFi();
-  // startTime = millis();
-  // while (millis() - startTime < STAGE_INTERVAL)
-  // {
-  //   measureDistance();
-  //   delay(100); // Delay between measurements
-  // }
-
-  // Now, turn on Firebase and send data every 1 second with distance measurements
-  Serial.println("Turning on Firebase and sending data every 0.5 second...");
   initFirebase();
-  startTime = millis();
 
-  while (millis() - startTime < 120000) {
-    if (millis() - sendDataPrevMillis > uploadInterval) {
-      float currentDistance = measureDistance();
-      sendDataToFirebase(currentDistance);
-      sendDataPrevMillis = millis();
-      count++;
-      if (count == 10) { // After 10 uploads, switch to 1 Hz
-        Serial.println("Sending data every 1 second...");
-        uploadInterval = 1000; // 1 time per second
-      } else if (count == 20) { // After 20 uploads, switch to 0.5 Hz
-        Serial.println("Sending data every 2 seconds...");
-        uploadInterval = 2000; // Once every 2 seconds
-      } else if (count == 30) { // After 30 uploads, switch to 0.333 Hz
-        Serial.println("Sending data every 3 seconds...");
-        uploadInterval = 3000; // Once every 3 seconds
-      } else if (count == 40) { // After 40 uploads, switch to 0.25 Hz
-        Serial.println("Sending data every 4 seconds...");
-        uploadInterval = 4000; // Once every 4 seconds
+  unsigned long startTime = millis();
+  unsigned long lastTimeObjectDetected = millis();
+
+  while (true) {
+    float distance = measureDistance();
+
+    // Check if distance is greater than 50cm
+    if (distance > 50) {
+      // Check if 30 seconds have passed since the object was last detected within 50cm
+      if (millis() - lastTimeObjectDetected > 30000) {
+        // Send a final message before going to sleep
+        Serial.println("No object detected within 50cm for 30 seconds. Going to sleep.");
+        sendDataToFirebase(distance);  // Optional: send the last distance reading before sleep
+
+        // Deep sleep for 30 seconds
+        esp_sleep_enable_timer_wakeup(30000 * 1000); // Time in microseconds
+        esp_deep_sleep_start();
+      }
+    } else { // if less than 50cm, send to firebase every 2 seconds
+      // Reset the timer as the object is detected within 50cm
+      lastTimeObjectDetected = millis();
+      // Send data to Firebase at regular intervals (e.g., every 5 seconds)
+      if (millis() - startTime > 2000) {
+        sendDataToFirebase(distance);
+        startTime = millis();
       }
     }
+
+    delay(100); // Delay to prevent too frequent sensor readings
   }
-//   // Go to deep sleep for 12 seconds
-//   Serial.println("Going to deep sleep for 12 seconds...");
-//   WiFi.disconnect();
-//   esp_sleep_enable_timer_wakeup(STAGE_INTERVAL * 1000); // in microseconds
-//   esp_deep_sleep_start();
 }
 
 void loop(){
