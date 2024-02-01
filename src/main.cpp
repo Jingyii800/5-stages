@@ -58,7 +58,7 @@ void setup() {
       if (millis() - lastTimeObjectDetected > 30000) {
         // Send a final message before going to sleep
         Serial.println("No object detected within 50cm for 30 seconds. Going to sleep.");
-        sendDataToFirebase(distance);  // Optional: send the last distance reading before sleep
+        sendDataToFirebase(distance);  // Send the last distance reading before sleep
 
         // Deep sleep for 30 seconds
         esp_sleep_enable_timer_wakeup(30000 * 1000); // Time in microseconds
@@ -67,7 +67,6 @@ void setup() {
     } else { // if less than 50cm, send to firebase every 2 seconds
       // Reset the timer as the object is detected within 50cm
       lastTimeObjectDetected = millis();
-      // Send data to Firebase at regular intervals (e.g., every 5 seconds)
       if (millis() - startTime > 2000) {
         sendDataToFirebase(distance);
         startTime = millis();
